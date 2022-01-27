@@ -18,9 +18,24 @@ H12 = re.compile(r"\d+-\d+-\d+\.\d+:\d+\s?(am|pm)", re.IGNORECASE)
 H24 = re.compile(r"\b\d+-\d+-\d+\.\d+:\d+\b", re.IGNORECASE)
 
 
+def _sort_names(alist):
+    """
+    Helps Meeting.comparator to sort by name
+    fully clashing meetings.
+    """
+    if alist[0] == alist[1]:
+        return 0
+    n_list = alist[:]
+    n_list.sort()
+    if n_list == alist:
+        return -1
+    else:
+        return 1
+
+
 def get_time_obj(atime):
     """
-    Normalise and return a datetime obj
+    Normalise and return a datetime object.
 
     Args:
         atime (str): 'YYYY-MM-DD HH:MM[am| PM]'
@@ -39,9 +54,10 @@ def get_time_obj(atime):
     raise ValueError("Invalid time string format: it must be HH:MM or HH:MM AM or HH:MMpm (case insensitive)")
 
 
-class Meeting(object):
+class Meeting:
     """
     Class to define a meeting.
+
     Attributes:
         name (str): meeting name
         start (str): meeting starting time
@@ -60,7 +76,7 @@ class Meeting(object):
 
     @staticmethod
     def comparator(a, b):
-        """Used to sort a list of Meetings"""
+        """Used to sort a list of Meetings."""
         if a.start < b.start:
             return -1
         elif a.start > b.start:
@@ -71,7 +87,7 @@ class Meeting(object):
             elif a.end < b.end:
                 return -1
             elif a.end == b.end:
-                return 0
+                return _sort_names([a.name, b.name])
 
     def __repr__(self) -> str:
         return f"{self.name} @ {self.start.strftime('%H:%M')}_{self.end.strftime('%H:%M')}"
@@ -79,7 +95,7 @@ class Meeting(object):
 
 def parse_cmdline():
     """
-    Input arguments and options
+    Input arguments and options.
 
     Returns:
         argparse.Namespace: opt
@@ -100,6 +116,15 @@ def parse_cmdline():
 
 
 def clashing_meetings(alist):
+    """
+    Find out the clashing Meetings.
+
+    Args:
+        data (List[Meetings]): list of Meetings objects
+
+    Returns:
+        [List[Meetings]]: a list of Meeting objects
+    """
     overlaps = []
     for i in range(len(alist) - 1):
         a_i = alist[i]
@@ -115,7 +140,8 @@ def clashing_meetings(alist):
 
 def get_meetings_list(data):
     """
-    Generate a list of instanciated Meeting objects from the input data
+    Generate a list of instantiated Meeting objects from the input data.
+
     Args:
         data (List[str]): list of strings e.g. ["8:15am,8:30am",...]
 
@@ -133,7 +159,7 @@ def get_meetings_list(data):
 
 def get_clashes():
     """
-    Take input arguments and process it
+    Take input arguments and process it.
 
     Returns:
         (Meeting A, Meeting B, Time): clashing meetings and overlapping time in minutes
@@ -151,7 +177,7 @@ def get_clashes():
 
 def main():
     """
-    Prints out the overlapping meetings
+    Prints out the overlapping meetings.
     """
     report = get_clashes()
     for clash in report:
