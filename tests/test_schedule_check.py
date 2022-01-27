@@ -74,10 +74,11 @@ def test_clashes():
 
 def test_cli():
     msgs = [
+        "Meetings conflict for 2021-12-25",
         "Meetings: <Meeting 2 @ 09:00_10:00> and <Meeting 3 @ 09:30_10:30> overlaps for 30 minutes (between 10:00",
         "Meetings: <Meeting 4 @ 10:45_13:00> and <Meeting 5 @ 12:00_13:00> overlaps for 60 minutes (between 13:00",
     ]
-    cmd = "env python3 ./schedule_check/report_meetings_clashes.py -i tests/times"
+    cmd = "env python3 ./schedule_check/report_meetings_clashes.py -i tests/times -d '2021-12-25'"
     out = check_output(cmd, shell=True, stderr=STDOUT).decode()
     for msg in msgs:
         assert msg in out

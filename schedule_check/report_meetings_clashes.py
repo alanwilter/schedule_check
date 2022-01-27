@@ -144,7 +144,7 @@ def clashing_meetings(alist: List[Meeting]) -> List[Tuple[Meeting, Meeting, int]
     return overlaps
 
 
-def get_meetings_list(data: List[str]) -> List[Meeting]:
+def get_meetings_list(data: List[str], day: Optional[str] = None) -> List[Meeting]:
 
     """
     Generate a list of instantiated Meeting objects from the input data.
@@ -158,7 +158,7 @@ def get_meetings_list(data: List[str]) -> List[Meeting]:
     meetings_list = []
     for n, row in enumerate(data[1:]):  # skip header
         start, end = row.strip().split(",")
-        meeting = Meeting(f"Meeting {n+1}", start, end)
+        meeting = Meeting(f"Meeting {n+1}", start, end, day)
         meetings_list.append(meeting)
 
     return meetings_list
@@ -175,7 +175,7 @@ def get_clashes() -> List[Tuple[Meeting, Meeting, int]]:
     with open(opt.infile) as f:
         data_times = f.readlines()
 
-    meetings_list = get_meetings_list(data_times)
+    meetings_list = get_meetings_list(data_times, opt.day)
     # sort meeting_list by starting time, shorter first if same starting time
     meetings_list.sort(key=cmp_to_key(Meeting.comparator))
 
@@ -187,6 +187,9 @@ def main() -> None:
     Prints out the overlapping meetings.
     """
     report = get_clashes()
+    if report:
+        day = report[0][0].start.strftime(fmt_day)
+        print(f"Meetings conflict for {day}")
     for clash in report:
         m1, m2, t_min = clash
         c_start = m1.end.strftime("%H:%M")
