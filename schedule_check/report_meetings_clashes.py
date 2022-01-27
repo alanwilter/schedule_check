@@ -19,45 +19,6 @@ H12 = re.compile(r"\d+-\d+-\d+\.\d+:\d+\s?(am|pm)", re.IGNORECASE)
 H24 = re.compile(r"\b\d+-\d+-\d+\.\d+:\d+\b", re.IGNORECASE)
 
 
-def _sort_names(alist: List[str]) -> int:
-    """
-    Helps Meeting.comparator to sort by name
-    fully clashing meetings.
-    """
-    if alist[0] == alist[1]:
-        return 0
-    n_list = alist[:]
-    n_list.sort()
-    if n_list == alist:
-        return -1
-    else:
-        return 1
-
-
-def get_time_obj(atime: str) -> datetime:
-    """
-    Normalise and return a datetime object.
-
-    Args:
-        atime (str): 'YYYY-MM-DD HH:MM[am| PM]'
-
-    Raises:
-        ValueError: case input time string is bad formatted
-
-    Returns:
-        datetime: datetime obj
-    """
-    d = H12.match(atime)
-    if d:
-        # remove space before AM|pm
-        res = d.group().replace(" ", "")
-        return datetime.strptime(res, fmt_12)
-    d = H24.fullmatch(atime)
-    if d:
-        return datetime.strptime(d.group(), fmt_24)
-    raise ValueError("Invalid time string format: it must be HH:MM or HH:MM AM or HH:MMpm (case insensitive)")
-
-
 class Meeting:
     """
     Class to define a meeting.
@@ -99,6 +60,45 @@ class Meeting:
         return f"{self.name} @ {self.start.strftime('%H:%M')}_{self.end.strftime('%H:%M')}"
 
 
+def _sort_names(alist: List[str]) -> int:
+    """
+    Helps Meeting.comparator to sort by name
+    fully clashing meetings.
+    """
+    if alist[0] == alist[1]:
+        return 0
+    n_list = alist[:]
+    n_list.sort()
+    if n_list == alist:
+        return -1
+    else:
+        return 1
+
+
+def get_time_obj(atime: str) -> datetime:
+    """
+    Normalise and return a datetime object.
+
+    Args:
+        atime (str): 'YYYY-MM-DD HH:MM[am| PM]'
+
+    Raises:
+        ValueError: case input time string is bad formatted
+
+    Returns:
+        datetime: datetime obj
+    """
+    d = H12.match(atime)
+    if d:
+        # remove space before AM|pm
+        res = d.group().replace(" ", "")
+        return datetime.strptime(res, fmt_12)
+    d = H24.fullmatch(atime)
+    if d:
+        return datetime.strptime(d.group(), fmt_24)
+    raise ValueError("Invalid time string format: it must be HH:MM or HH:MM AM or HH:MMpm (case insensitive)")
+
+
 def parse_cmdline() -> argparse.Namespace:
     """
     Input arguments and options.
@@ -121,7 +121,7 @@ def parse_cmdline() -> argparse.Namespace:
     return opt
 
 
-def clashing_meetings(alist: List[Meeting]) -> List[Tuple[Meeting, Meeting, int]]:
+def _clashing_meetings(alist: List[Meeting]) -> List[Tuple[Meeting, Meeting, int, str, str]]:
     """
     Find out the clashing Meetings.
 
@@ -129,9 +129,10 @@ def clashing_meetings(alist: List[Meeting]) -> List[Tuple[Meeting, Meeting, int]
         alist (List[Meeting]): list of Meetings objects
 
     Returns:
-        List[Tuple[Meeting, Meeting, int]]: a list of Meeting objects
+        List[Tuple[Meeting, Meeting, int, str, str]]:
+            clashing meetings and overlapping time (with start and end) in minutes
     """
-    overlaps: List[Tuple[Meeting, Meeting, int]] = []
+    overlaps: List[Tuple[Meeting, Meeting, int, str, str]] = []
     for i in range(len(alist) - 1):
         a_i = alist[i]
         for j in range(i + 1, len(alist)):
@@ -140,7 +141,17 @@ def clashing_meetings(alist: List[Meeting]) -> List[Tuple[Meeting, Meeting, int]
             e_end = min(a_i.end, a_j.end)
             if e_end > l_start:
                 clash_minutes = (e_end - l_start).seconds // 60
-                overlaps.append((a_i, a_j, clash_minutes))
+                begin = l_start.strftime("%H:%M")
+                end = e_end.strftime("%H:%M")
+                overlaps.append(
+                    (
+                        a_i,
+                        a_j,
+                        clash_minutes,
+                        begin,
+                        end,
+                    )
+                )
     return overlaps
 
 
@@ -164,12 +175,13 @@ def get_meetings_list(data: List[str], day: Optional[str] = None) -> List[Meetin
     return meetings_list
 
 
-def get_clashes() -> List[Tuple[Meeting, Meeting, int]]:
+def get_clashes() -> List[Tuple[Meeting, Meeting, int, str, str]]:
     """
     Take input arguments and process it.
 
     Returns:
-        List[Tuple[Meeting, Meeting, int]]: clashing meetings and overlapping time in minutes
+        List[Tuple[Meeting, Meeting, int, str, str]]:
+            clashing meetings and overlapping time (with start and end) in minutes
     """
     opt = parse_cmdline()
     with open(opt.infile) as f:
@@ -179,7 +191,7 @@ def get_clashes() -> List[Tuple[Meeting, Meeting, int]]:
     # sort meeting_list by starting time, shorter first if same starting time
     meetings_list.sort(key=cmp_to_key(Meeting.comparator))
 
-    return clashing_meetings(meetings_list)
+    return _clashing_meetings(meetings_list)
 
 
 def main() -> None:
@@ -191,10 +203,8 @@ def main() -> None:
         day = report[0][0].start.strftime(fmt_day)
         print(f"Meetings conflict for {day}")
     for clash in report:
-        m1, m2, t_min = clash
-        c_start = m1.end.strftime("%H:%M")
-        c_end = m2.end.strftime("%H:%M")
-        print(f"Meetings: <{m1}> and <{m2}> overlaps for {t_min} minutes (between {c_start} and {c_end})")
+        m1, m2, t_min, begin, end = clash
+        print(f"Meetings: <{m1}> and <{m2}> overlaps for {t_min} min ({begin} to {end})")
 
 
 if __name__ == "__main__":

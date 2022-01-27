@@ -4,7 +4,7 @@ from subprocess import STDOUT, check_output
 import pytest
 
 from schedule_check import __version__
-from schedule_check.report_meetings_clashes import Meeting, clashing_meetings, get_meetings_list, get_time_obj
+from schedule_check.report_meetings_clashes import Meeting, _clashing_meetings, get_meetings_list, get_time_obj
 
 
 def test_version():
@@ -68,15 +68,15 @@ def test_clashes():
         == "[Meeting 1 @ 09:00_10:00, Meeting 2 @ 09:30_10:30, Meeting 3 @ 13:30_15:00, Meeting 4 @ 15:00_15:30]"
     )
     m_list.sort(key=cmp_to_key(Meeting.comparator))
-    c = clashing_meetings(m_list)
-    assert repr(c) == "[(Meeting 1 @ 09:00_10:00, Meeting 2 @ 09:30_10:30, 30)]"
+    c = _clashing_meetings(m_list)
+    assert repr(c) == "[(Meeting 1 @ 09:00_10:00, Meeting 2 @ 09:30_10:30, 30, '09:30', '10:00')]"
 
 
 def test_cli():
     msgs = [
         "Meetings conflict for 2021-12-25",
-        "Meetings: <Meeting 2 @ 09:00_10:00> and <Meeting 3 @ 09:30_10:30> overlaps for 30 minutes (between 10:00",
-        "Meetings: <Meeting 4 @ 10:45_13:00> and <Meeting 5 @ 12:00_13:00> overlaps for 60 minutes (between 13:00",
+        "Meetings: <Meeting 2 @ 09:00_10:00> and <Meeting 3 @ 09:30_10:30> overlaps for 30 min (09:30 to 10:00)",
+        "Meetings: <Meeting 4 @ 10:45_13:00> and <Meeting 5 @ 12:00_13:00> overlaps for 60 min (12:00 to 13:00)",
     ]
     cmd = "env python3 ./schedule_check/report_meetings_clashes.py -i tests/times -d '2021-12-25'"
     out = check_output(cmd, shell=True, stderr=STDOUT).decode()
