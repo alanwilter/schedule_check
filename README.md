@@ -27,7 +27,11 @@ optional arguments:
 ```text
 $> report_schedule -i tests/times -d '2021-12-25'
 
-Meetings conflict for 2021-12-25
-Meetings: <Meeting 2 @ 09:00_10:00> and <Meeting 3 @ 09:30_10:30> overlaps for 30 minutes (between 10:00 and 10:30)
-Meetings: <Meeting 4 @ 10:45_13:00> and <Meeting 5 @ 12:00_13:00> overlaps for 60 minutes (between 13:00 and 13:00)
+>>>Meetings conflict for 2021-12-25
+Meetings: <Meeting 2 @ 09:00_10:00> and <Meeting 3 @ 09:30_10:30> overlaps for 30 min (09:30 to 10:00)
+Meetings: <Meeting 4 @ 10:45_13:00> and <Meeting 5 @ 12:00_13:00> overlaps for 60 min (12:00 to 13:00)
+
+>>>Invalid Meetings, outside working hours for 2021-12-25: 08:00 to 17:00
+Meeting 9 @ 18:00_19:00
+Meeting 10 @ 20:00_21:00
 ```

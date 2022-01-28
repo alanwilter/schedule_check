@@ -4,7 +4,7 @@ Report which meetings are clashing with one another.
 """
 import argparse
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 from functools import cmp_to_key
 from typing import List, Optional, Tuple
 
@@ -24,20 +24,50 @@ class Meeting:
     Class to define a meeting.
 
     Attributes:
-        name (str): meeting name
-        start (str): meeting starting time
-        end (str): meeting ending time
-        day (str, optional): day of the meeting. Defaults to None.
+        name (str)             : Meeting name
+        start (datetime)       : Meeting starting time
+        end (datetime)         : Meeting ending time
+        str_day (str, optional): Day of the meeting. Defaults to current day.
+        day_start              : Working hours start
+        day_end                : Working hours end
     """
 
     def __init__(self, name: str, start: str, end: str, day: Optional[str] = None):
+        """
+        Args:
+            name (str): Meeting name
+            start (str): Meeting starting time in string
+            end (str): Meeting ending time in string
+            day (Optional[str], optional): Day of the meeting. Defaults to None -> current day.
+        """
         self.name = name
         if not day:
             day = str_today
+        self.str_day = day
         start = f"{day}.{start}"
         end = f"{day}.{end}"
         self.start = get_time_obj(start)
         self.end = get_time_obj(end)
+        self.is_valid = True  # until proved not
+
+    def check_validity(self, day_start: str, day_end: str) -> bool:
+        """
+        Check if a Meeting is within working hours
+
+        Args:
+            day_start (str): Day starting time in string
+            day_end (str): Day ending time in string
+
+        Returns:
+            bool: True or false
+        """
+        self.day_start = get_time_obj(f"{self.str_day}.{day_start}")
+        self.day_end = get_time_obj(f"{self.str_day}.{day_end}")
+        if self.start < self.day_start:
+            self.is_valid = False
+        if self.end > self.day_end:
+            self.is_valid = False
+        return self.is_valid
 
     @staticmethod
     def comparator(a, b) -> int:
@@ -93,9 +123,13 @@ def get_time_obj(atime: str) -> datetime:
         # remove space before AM|pm
         res = d.group().replace(" ", "")
         return datetime.strptime(res, fmt_12)
+
     d = H24.fullmatch(atime)
     if d:
+        if "24:00" in d.group():  # next day
+            return datetime.strptime(d.group().replace("24:00", "00:00"), fmt_24) + timedelta(days=1)
         return datetime.strptime(d.group(), fmt_24)
+
     raise ValueError("Invalid time string format: it must be HH:MM or HH:MM AM or HH:MMpm (case insensitive)")
 
 
@@ -155,56 +189,89 @@ def _clashing_meetings(alist: List[Meeting]) -> List[Tuple[Meeting, Meeting, int
     return overlaps
 
 
-def get_meetings_list(data: List[str], day: Optional[str] = None) -> List[Meeting]:
-
+def get_meetings_list(data: List[str], day: Optional[str] = None) -> Tuple[List[Meeting], List[Meeting]]:
     """
     Generate a list of instantiated Meeting objects from the input data.
 
     Args:
         data (List[str]): list of strings e.g. ["8:15am,8:30am",...]
+        day (Optional[str], optional): [description]. Defaults None.
 
     Returns:
-        List[Meeting]: a list of instanciated Meeting objects
+        Tuple[List[Meeting], List[Meeting]]: a tuple of lists of valid and invalid sorted instanciated Meeting objects
     """
-    meetings_list = []
+    meetings_list: List[Meeting] = []
+    # 12am = 00:00, 12pm = 12:00
+    day_start = "0:00"
+    day_end = "24:00"
     for n, row in enumerate(data[1:]):  # skip header
         start, end = row.strip().split(",")
-        meeting = Meeting(f"Meeting {n+1}", start, end, day)
-        meetings_list.append(meeting)
 
-    return meetings_list
+        # parse single input, optional, defines the day work schedule, otherwise
+        # otherwise any meeting in 24 h is valid
+        if not end:
+            day_start = start
+        if not start:
+            day_end = end
+
+        if start and end:
+            meeting = Meeting(f"Meeting {n+1}", start, end, day)
+            meetings_list.append(meeting)
+
+    # sort meeting_list by starting time, shorter first if same starting time
+    meetings_list.sort(key=cmp_to_key(Meeting.comparator))
+
+    valid_meetings = []
+    invalid_meetings = []
+    for m in meetings_list:
+        if m.check_validity(day_start, day_end):
+            valid_meetings.append(m)
+        else:
+            invalid_meetings.append(m)
+
+    return (valid_meetings, invalid_meetings)
 
 
-def get_clashes() -> List[Tuple[Meeting, Meeting, int, str, str]]:
+def process_args() -> Tuple[List[str], str]:
+    opt = parse_cmdline()
+    with open(opt.infile) as f:
+        data_times = f.readlines()
+    return data_times, opt.day
+
+
+def get_clashes() -> Tuple[List[Tuple[Meeting, Meeting, int, str, str]], List[Meeting]]:
     """
     Take input arguments and process it.
 
     Returns:
-        List[Tuple[Meeting, Meeting, int, str, str]]:
-            clashing meetings and overlapping time (with start and end) in minutes
+        Tuple[List[Tuple[Meeting, Meeting, int, str, str]], List[Meeting]]:
+            clashing meetings and overlapping time (with start and end) in minutes plus invalid meetings
     """
-    opt = parse_cmdline()
-    with open(opt.infile) as f:
-        data_times = f.readlines()
+    data_times, day = process_args()
+    m_valid, m_invalid = get_meetings_list(data_times, day)
 
-    meetings_list = get_meetings_list(data_times, opt.day)
-    # sort meeting_list by starting time, shorter first if same starting time
-    meetings_list.sort(key=cmp_to_key(Meeting.comparator))
-
-    return _clashing_meetings(meetings_list)
+    return (_clashing_meetings(m_valid), m_invalid)
 
 
 def main() -> None:
     """
     Prints out the overlapping meetings.
     """
-    report = get_clashes()
-    if report:
-        day = report[0][0].start.strftime(fmt_day)
-        print(f"Meetings conflict for {day}")
-    for clash in report:
+    valid_tuple, invalid_list = get_clashes()
+    if valid_tuple:
+        day = valid_tuple[0][0].start.strftime(fmt_day)
+        print(f">>>Meetings conflict for {day}")
+    for clash in valid_tuple:
         m1, m2, t_min, begin, end = clash
         print(f"Meetings: <{m1}> and <{m2}> overlaps for {t_min} min ({begin} to {end})")
+    if invalid_list:
+        if valid_tuple:
+            print()
+        day_start = invalid_list[0].day_start.strftime("%H:%M")
+        day_end = invalid_list[0].day_end.strftime("%H:%M")
+        print(f">>>Invalid Meetings, outside working hours for {day}: {day_start} to {day_end}")
+    for inv in invalid_list:
+        print(inv)
 
 
 if __name__ == "__main__":
