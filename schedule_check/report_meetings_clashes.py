@@ -233,19 +233,25 @@ def get_meetings_list(data: List[str], day: Optional[str] = None) -> Tuple[List[
 
 
 def process_args() -> Tuple[List[str], str]:
+    """
+    Take input arguments and process it.
+
+    Returns:
+        Tuple[List[str], str]: List of schedules plus day in case
+    """
     opt = parse_cmdline()
     with open(opt.infile) as f:
         data_times = f.readlines()
     return data_times, opt.day
 
 
-def get_clashes() -> Tuple[List[Tuple[Meeting, Meeting, int, str, str]], List[Meeting]]:
+def get_results() -> Tuple[List[Tuple[Meeting, Meeting, int, str, str]], List[Meeting]]:
     """
-    Take input arguments and process it.
+    Get all the results.
 
     Returns:
         Tuple[List[Tuple[Meeting, Meeting, int, str, str]], List[Meeting]]:
-            clashing meetings and overlapping time (with start and end) in minutes plus invalid meetings
+            Clashing meetings and overlapping time (with start and end) in minutes plus invalid meetings
     """
     data_times, day = process_args()
     m_valid, m_invalid = get_meetings_list(data_times, day)
@@ -257,7 +263,7 @@ def main() -> None:
     """
     Prints out the overlapping meetings.
     """
-    valid_tuple, invalid_list = get_clashes()
+    valid_tuple, invalid_list = get_results()
     if valid_tuple:
         day = valid_tuple[0][0].start.strftime(fmt_day)
         print(f">>>Meetings conflict for {day}")
